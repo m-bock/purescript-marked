@@ -5,5 +5,6 @@ in conf // {
     [ "spec-discovery"
     , "aff"
     , "spec"
+    , "ts-bridge"
     ]
 }

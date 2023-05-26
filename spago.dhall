@@ -1,9 +1,12 @@
 { name = "marked"
 , dependencies =
   [ "console"
+  , "dts"
   , "effect"
   , "either"
   , "maybe"
+  , "newtype"
+  , "nullable"
   , "prelude"
   , "unsafe-coerce"
   , "untagged-union"

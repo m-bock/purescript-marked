@@ -6,5 +6,8 @@
   "dependencies": {
     "@types/marked": "^5.0.0",
     "marked": "^5.0.2"
+  },
+  "devDependencies": {
+    "prettier": "^2.8.8"
   }
 }

@@ -1,6 +1,6 @@
 import { marked } from "marked";
 
-export const parseImpl = (str) => {
+export const lexerImpl = (str) => {
   try {
     const value = marked.lexer(str)
     console.log(value)
@@ -15,3 +15,4 @@ export const parseImpl = (str) => {
     };
   }
 };
+

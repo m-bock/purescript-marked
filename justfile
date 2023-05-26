@@ -32,3 +32,7 @@ check-format:
     purs-tidy check "src/**/*.purs"
     purs-tidy check "test/**/*.purs"
     purs-tidy check "samples/**/*.purs"
+
+gen-ts:
+    spago {{cfg_test}} run --purs-args "{{purs_args}}" --main TsBridge.Main
+    yarn run prettier --write output/*/index.d.ts
