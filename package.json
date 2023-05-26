@@ -1,0 +1,10 @@
+{
+  "name": "purescript-marked",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "@types/marked": "^5.0.0",
+    "marked": "^5.0.2"
+  }
+}
