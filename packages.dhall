@@ -48,5 +48,5 @@ in  upstream
       , repo =
           "https://github.com/thought2/purescript-ts-bridge.git"
       , version =
-          "main"
+          "literals"
       }

@@ -10,6 +10,7 @@ import Data.Newtype (class Newtype, un)
 import Data.Nullable (Nullable)
 import Data.Nullable as Nullable
 import Data.Show.Generic (genericShow)
+import Data.Symbol (class IsSymbol, reflectSymbol)
 import Data.Variant (Variant)
 import Data.Variant as V
 import Data.Variant.Encodings.Flat (VariantEncFlat)
@@ -17,7 +18,8 @@ import Data.Variant.Encodings.Flat as VF
 import Data.Variant.Encodings.Nested (VariantEncNested)
 import Data.Variant.Encodings.Nested as VN
 import TsBridge as TSB
-import TsBridge.Class (Tok(..))
+import TsBridge.Class (class TsBridge, Tok(..), tsBridge)
+import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 import Untagged.Union (UndefinedOr, fromOneOf)
 
@@ -82,6 +84,23 @@ tokenFromImpl = un TokenImpl >>> (VF.variantFromVariantEnc :: _ -> Variant Token
 
 newtype TokenImpl = TokenImpl (VariantEncFlat "type" TokenRow)
 
+instance TsBridge TokenImpl where
+  tsBridge _ = tsBridge (Proxy :: _ (VariantEncFlat "type" TokenRow))
+
+-- instance TsBridge TokenImpl where
+--   tsBridge x = TSB.tsBridgeNewtype
+--     Tok
+--     { moduleName
+--     , typeName: "TokenImpl"
+--     , typeArgs: []
+--     }
+--     x
+
+newtype ByRef sym a = ByRef a
+
+instance IsSymbol sym => TsBridge (ByRef sym a) where
+  tsBridge _ = pure $ DTS.TsTypeVar (DTS.TsName $ reflectSymbol (Proxy :: _ sym))
+
 type TokenRow =
   ( space :: {}
   , code :: { lang :: Nullable String, text :: String }
@@ -108,6 +127,7 @@ derive instance Generic AlignTable _
 derive instance Generic ListItem _
 
 derive instance Newtype TokenImpl _
+derive instance Newtype (ByRef sym a) _
 
 derive instance Eq Token
 derive instance Eq TableCell
@@ -136,6 +156,7 @@ moduleName = "Marked"
 tsModules :: Either TSB.AppError (Array DTS.TsModuleFile)
 tsModules =
   TSB.tsModuleFile moduleName
-    [
-    -- TSB.tsTypeAlias "FFI" (Proxy :: _ FFI)
+    [ TSB.tsValues Tok
+        { 
+        }
     ]
