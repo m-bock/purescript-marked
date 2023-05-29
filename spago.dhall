@@ -4,15 +4,16 @@
   , "dts"
   , "effect"
   , "either"
+  , "integers"
   , "maybe"
   , "newtype"
   , "nullable"
   , "prelude"
+  , "ts-bridge"
   , "unsafe-coerce"
   , "untagged-union"
   , "variant"
   , "variant-encodings"
-  , "ts-bridge"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs" ]

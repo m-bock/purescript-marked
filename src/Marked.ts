@@ -1,20 +1,18 @@
 import { marked } from "marked";
-import { FFI } from "../output/Marked";
+import { LexerImpl } from "../output/Marked";
 
-const lexerImpl = (str: string) => {
+const lexerImpl: LexerImpl = (str) => {
   try {
     const value = marked.lexer(str);
-    console.log(value);
+
     return {
       type: "success",
       value,
-    } as const;
+    };
   } catch (e) {
     return {
       type: "failure",
       value: e.message,
-    } as const;
+    };
   }
 };
-
-export const ffi : FFI = { lexerImpl };

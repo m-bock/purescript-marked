@@ -5,23 +5,22 @@ import Prelude
 import DTS as DTS
 import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
-import Data.Maybe (Maybe(..))
+import Data.Int as Int
+import Data.Maybe (Maybe, fromMaybe)
 import Data.Newtype (class Newtype, un)
-import Data.Nullable (Nullable)
-import Data.Nullable as Nullable
 import Data.Show.Generic (genericShow)
-import Data.Symbol (class IsSymbol, reflectSymbol)
 import Data.Variant (Variant)
 import Data.Variant as V
 import Data.Variant.Encodings.Flat (VariantEncFlat)
 import Data.Variant.Encodings.Flat as VF
 import Data.Variant.Encodings.Nested (VariantEncNested)
 import Data.Variant.Encodings.Nested as VN
+import Prim.Boolean (True)
+import TsBridge (Mod, TsRecord, toRecord)
 import TsBridge as TSB
-import TsBridge.Class (class TsBridge, Tok(..), tsBridge)
+import TsBridge.Class (class TsBridge, Tok(..))
 import Type.Proxy (Proxy(..))
-import Unsafe.Coerce (unsafeCoerce)
-import Untagged.Union (UndefinedOr, fromOneOf)
+import Untagged.Union (UndefinedOr, uorToMaybe)
 
 -------------------------------------------------------------------------------
 --- Types
@@ -33,18 +32,24 @@ data Token
   = TokSpace
   | TokCode { text :: String, lang :: Maybe String }
   | TokHeading { depth :: Int, tokens :: Array Token }
-  --
-  | TokText { text :: String }
+  | TokTable {}
+  | TokHr {}
+  | TokBlockquote {}
+  | TokList {}
+  | TokListItem {}
   | TokParagraph { tokens :: Array Token }
-
--- | TokTable
---     { align :: Maybe AlignTable
---     , header :: Array TableCell
---     , rows :: Array (Array TableCell)
---     }
--- | TokHr
--- | TokBlockquote { tokens :: Array Token }
--- | TokList { items :: Array ListItem }
+  | TokHtml {}
+  | TokText { text :: String }
+  | TokDef {}
+  | TokEscape {}
+  | TokTag {}
+  | TokImage {}
+  | TokLink {}
+  | TokStrong {}
+  | TokEm {}
+  | TokCodespan {}
+  | TokBr {}
+  | TokDel {}
 
 data ListItem = ListItem
 
@@ -68,13 +73,56 @@ eitherFromImpl = (VN.variantFromVariantEnc) >>>
   )
 
 tokenFromImpl :: TokenImpl -> Token
-tokenFromImpl = un TokenImpl >>> (VF.variantFromVariantEnc :: _ -> Variant TokenRow) >>>
+tokenFromImpl = un TokenImpl >>> (VF.variantFromVariantEnc :: (VariantEncFlat "type" TokenRow) -> Variant TokenRow) >>>
   ( V.case_ # V.onMatch
-      { space: \_ -> TokSpace
-      , code: \{ text, lang } -> TokCode { text, lang: Nullable.toMaybe lang }
-      , heading: \{ depth, tokens } -> TokHeading { depth, tokens: map tokenFromImpl tokens }
-      , text: \{ text } -> TokText { text }
-      , paragraph: \{ tokens } -> TokParagraph { tokens: map tokenFromImpl tokens }
+      { space: \_ ->
+          TokSpace
+      , code: toRecord >>> \{ text, lang } ->
+          TokCode
+            { text
+            , lang: lang >>= uorToMaybe
+            }
+      , heading: \{ depth, tokens } ->
+          TokHeading
+            { depth: fromMaybe 0 $ Int.fromNumber depth
+            , tokens: map tokenFromImpl tokens
+            }
+      , table: \_ ->
+          TokTable {}
+      , hr: \_ ->
+          TokHr {}
+      , blockquote: \_ ->
+          TokBlockquote {}
+      , list: \_ ->
+          TokList {}
+      , list_item: \_ ->
+          TokListItem {}
+      , paragraph: \{ tokens } ->
+          TokParagraph { tokens: map tokenFromImpl tokens }
+      , html: \_ ->
+          TokHtml {}
+      , text: \{ text } ->
+          TokText { text }
+      , def: \_ ->
+          TokDef {}
+      , escape: \_ ->
+          TokEscape {}
+      , tag: \_ ->
+          TokTag {}
+      , link: \_ ->
+          TokLink {}
+      , image: \_ ->
+          TokImage {}
+      , strong: \_ ->
+          TokStrong {}
+      , em: \_ ->
+          TokEm {}
+      , codespan: \_ ->
+          TokCodespan {}
+      , br: \_ ->
+          TokBr {}
+      , del: \_ ->
+          TokDel {}
       }
   )
 
@@ -85,28 +133,40 @@ tokenFromImpl = un TokenImpl >>> (VF.variantFromVariantEnc :: _ -> Variant Token
 newtype TokenImpl = TokenImpl (VariantEncFlat "type" TokenRow)
 
 instance TsBridge TokenImpl where
-  tsBridge _ = tsBridge (Proxy :: _ (VariantEncFlat "type" TokenRow))
-
--- instance TsBridge TokenImpl where
---   tsBridge x = TSB.tsBridgeNewtype
---     Tok
---     { moduleName
---     , typeName: "TokenImpl"
---     , typeArgs: []
---     }
---     x
-
-newtype ByRef sym a = ByRef a
-
-instance IsSymbol sym => TsBridge (ByRef sym a) where
-  tsBridge _ = pure $ DTS.TsTypeVar (DTS.TsName $ reflectSymbol (Proxy :: _ sym))
+  tsBridge x = TSB.tsBridgeNewtype
+    Tok
+    { moduleName
+    , typeName: "TokenImpl"
+    , typeArgs: []
+    }
+    x
 
 type TokenRow =
   ( space :: {}
-  , code :: { lang :: Nullable String, text :: String }
-  , heading :: { depth :: Int, tokens :: Array TokenImpl }
-  , text :: { text :: String }
+  , code ::
+      TsRecord
+        ( lang :: Mod (optional :: True) (UndefinedOr String)
+        , text :: Mod () String
+        )
+  , heading :: { depth :: Number, tokens :: Array TokenImpl }
+  , table :: {}
+  , hr :: {}
+  , blockquote :: {}
+  , list :: {}
+  , list_item :: {}
   , paragraph :: { tokens :: Array TokenImpl }
+  , html :: {}
+  , text :: { text :: String }
+  , def :: {}
+  , escape :: {}
+  , tag :: {}
+  , link :: {}
+  , image :: {}
+  , strong :: {}
+  , em :: {}
+  , codespan :: {}
+  , br :: {}
+  , del :: {}
   )
 
 type EitherImpl a b =
@@ -115,7 +175,9 @@ type EitherImpl a b =
     , failure :: a
     )
 
-foreign import lexerImpl :: String -> EitherImpl String (Array TokenImpl)
+type LexerImpl = String -> EitherImpl String (Array TokenImpl)
+
+foreign import lexerImpl :: LexerImpl
 
 -------------------------------------------------------------------------------
 --- Instances
@@ -127,8 +189,6 @@ derive instance Generic AlignTable _
 derive instance Generic ListItem _
 
 derive instance Newtype TokenImpl _
-derive instance Newtype (ByRef sym a) _
-
 derive instance Eq Token
 derive instance Eq TableCell
 derive instance Eq AlignTable
@@ -156,7 +216,5 @@ moduleName = "Marked"
 tsModules :: Either TSB.AppError (Array DTS.TsModuleFile)
 tsModules =
   TSB.tsModuleFile moduleName
-    [ TSB.tsValues Tok
-        { 
-        }
+    [ TSB.tsTypeAlias Tok "LexerImpl" (Proxy :: _ LexerImpl)
     ]
