@@ -36,3 +36,6 @@ check-format:
 gen-ts:
     spago {{cfg_test}} run --purs-args "{{purs_args}}" --main TsBridge.Main
     yarn run prettier --write output/*/index.d.ts
+
+check-ts:
+    tsc

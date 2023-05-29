@@ -5,6 +5,7 @@
   , "effect"
   , "either"
   , "integers"
+  , "labeled-data"
   , "maybe"
   , "newtype"
   , "nullable"

@@ -6,12 +6,12 @@ const lexerImpl: LexerImpl = (str) => {
     const value = marked.lexer(str);
 
     return {
-      type: "success",
+      type: "right",
       value,
     };
   } catch (e) {
     return {
-      type: "failure",
+      type: "left",
       value: e.message,
     };
   }

@@ -3,18 +3,17 @@ module Marked where
 import Prelude
 
 import DTS as DTS
-import Data.Either (Either(..))
+import Data.Either (Either)
 import Data.Generic.Rep (class Generic)
 import Data.Int as Int
 import Data.Maybe (Maybe, fromMaybe)
 import Data.Newtype (class Newtype, un)
 import Data.Show.Generic (genericShow)
-import Data.Variant (Variant)
 import Data.Variant as V
 import Data.Variant.Encodings.Flat (VariantEncodedFlat)
 import Data.Variant.Encodings.Flat as VF
-import Data.Variant.Encodings.Nested (VariantEncodedNested)
-import Data.Variant.Encodings.Nested as VN
+import LabeledData.VariantLike.Class (EitherV)
+import LabeledData.VariantLike.Class as LD
 import Prim.Boolean (True)
 import TsBridge (Mod, TsRecord, toRecord)
 import TsBridge as TSB
@@ -60,17 +59,9 @@ data AlignTable = AlignCenter | AlignLeft | AlignRight
 -------------------------------------------------------------------------------
 
 lexer :: String -> Either LexerError (Array Token)
-lexer = lexerImpl >>> eitherFromImpl >>> map (map tokenFromImpl)
+lexer = lexerImpl >>> LD.fromVariant >>> map (map tokenFromImpl)
 
 -------------------------------------------------------------------------------
-
-eitherFromImpl :: forall a b. EitherImpl a b -> Either a b
-eitherFromImpl = VN.normalizeEncodingNested >>>
-  ( V.case_ # V.onMatch
-      { success: Right
-      , failure: Left
-      }
-  )
 
 tokenFromImpl :: TokenImpl -> Token
 tokenFromImpl =
@@ -172,13 +163,7 @@ type TokenRow =
   , del :: {}
   )
 
-type EitherImpl a b =
-  VariantEncodedNested "type" "value"
-    ( success :: b
-    , failure :: a
-    )
-
-type LexerImpl = String -> EitherImpl String (Array TokenImpl)
+type LexerImpl = String -> EitherV String (Array TokenImpl)
 
 foreign import lexerImpl :: LexerImpl
 
