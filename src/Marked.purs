@@ -11,9 +11,9 @@ import Data.Newtype (class Newtype, un)
 import Data.Show.Generic (genericShow)
 import Data.Variant (Variant)
 import Data.Variant as V
-import Data.Variant.Encodings.Flat (VariantEncFlat)
+import Data.Variant.Encodings.Flat (VariantEncodedFlat)
 import Data.Variant.Encodings.Flat as VF
-import Data.Variant.Encodings.Nested (VariantEncNested)
+import Data.Variant.Encodings.Nested (VariantEncodedNested)
 import Data.Variant.Encodings.Nested as VN
 import Prim.Boolean (True)
 import TsBridge (Mod, TsRecord, toRecord)
@@ -65,7 +65,7 @@ lexer = lexerImpl >>> eitherFromImpl >>> map (map tokenFromImpl)
 -------------------------------------------------------------------------------
 
 eitherFromImpl :: forall a b. EitherImpl a b -> Either a b
-eitherFromImpl = (VN.variantFromVariantEnc) >>>
+eitherFromImpl = VN.normalizeEncodingNested >>>
   ( V.case_ # V.onMatch
       { success: Right
       , failure: Left
@@ -73,64 +73,67 @@ eitherFromImpl = (VN.variantFromVariantEnc) >>>
   )
 
 tokenFromImpl :: TokenImpl -> Token
-tokenFromImpl = un TokenImpl >>> (VF.variantFromVariantEnc :: (VariantEncFlat "type" TokenRow) -> Variant TokenRow) >>>
-  ( V.case_ # V.onMatch
-      { space: \_ ->
-          TokSpace
-      , code: toRecord >>> \{ text, lang } ->
-          TokCode
-            { text
-            , lang: lang >>= uorToMaybe
-            }
-      , heading: \{ depth, tokens } ->
-          TokHeading
-            { depth: fromMaybe 0 $ Int.fromNumber depth
-            , tokens: map tokenFromImpl tokens
-            }
-      , table: \_ ->
-          TokTable {}
-      , hr: \_ ->
-          TokHr {}
-      , blockquote: \_ ->
-          TokBlockquote {}
-      , list: \_ ->
-          TokList {}
-      , list_item: \_ ->
-          TokListItem {}
-      , paragraph: \{ tokens } ->
-          TokParagraph { tokens: map tokenFromImpl tokens }
-      , html: \_ ->
-          TokHtml {}
-      , text: \{ text } ->
-          TokText { text }
-      , def: \_ ->
-          TokDef {}
-      , escape: \_ ->
-          TokEscape {}
-      , tag: \_ ->
-          TokTag {}
-      , link: \_ ->
-          TokLink {}
-      , image: \_ ->
-          TokImage {}
-      , strong: \_ ->
-          TokStrong {}
-      , em: \_ ->
-          TokEm {}
-      , codespan: \_ ->
-          TokCodespan {}
-      , br: \_ ->
-          TokBr {}
-      , del: \_ ->
-          TokDel {}
-      }
-  )
+tokenFromImpl =
+  un TokenImpl
+    >>> VF.normalizeEncodingFlat
+    >>>
+      ( V.case_ # V.onMatch
+          { space: \_ ->
+              TokSpace
+          , code: toRecord >>> \{ text, lang } ->
+              TokCode
+                { text
+                , lang: lang >>= uorToMaybe
+                }
+          , heading: \{ depth, tokens } ->
+              TokHeading
+                { depth: fromMaybe 0 $ Int.fromNumber depth
+                , tokens: map tokenFromImpl tokens
+                }
+          , table: \_ ->
+              TokTable {}
+          , hr: \_ ->
+              TokHr {}
+          , blockquote: \_ ->
+              TokBlockquote {}
+          , list: \_ ->
+              TokList {}
+          , list_item: \_ ->
+              TokListItem {}
+          , paragraph: \{ tokens } ->
+              TokParagraph { tokens: map tokenFromImpl tokens }
+          , html: \_ ->
+              TokHtml {}
+          , text: \{ text } ->
+              TokText { text }
+          , def: \_ ->
+              TokDef {}
+          , escape: \_ ->
+              TokEscape {}
+          , tag: \_ ->
+              TokTag {}
+          , link: \_ ->
+              TokLink {}
+          , image: \_ ->
+              TokImage {}
+          , strong: \_ ->
+              TokStrong {}
+          , em: \_ ->
+              TokEm {}
+          , codespan: \_ ->
+              TokCodespan {}
+          , br: \_ ->
+              TokBr {}
+          , del: \_ ->
+              TokDel {}
+          }
+      )
 
 -------------------------------------------------------------------------------
 --- FFI
 -------------------------------------------------------------------------------
 
-newtype TokenImpl = TokenImpl (VariantEncFlat "type" TokenRow)
+newtype TokenImpl = TokenImpl (VariantEncodedFlat "type" TokenRow)
 
 instance TsBridge TokenImpl where
   tsBridge x = TSB.tsBridgeNewtype
@@ -170,7 +173,7 @@ type TokenRow =
   )
 
 type EitherImpl a b =
-  VariantEncNested "type" "value"
+  VariantEncodedNested "type" "value"
     ( success :: b
     , failure :: a
     )
