@@ -10,9 +10,11 @@ const lexerImpl: LexerImpl = (str) => {
       value,
     };
   } catch (e) {
+    const message = e instanceof Error ? e.message : "unknown error";
+    
     return {
       type: "left",
-      value: e.message,
+      value: message,
     };
   }
 };
