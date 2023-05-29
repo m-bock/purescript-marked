@@ -19,23 +19,24 @@ clean:
 ide:
     spago {{cfg_test}} test --purs-args "{{purs_args}} --json-errors"
 
-ci: clean build-strict test-strict
+ci: check-format build-strict test-strict build-all
 
+build-all: build-ts-ignore build gen-ts build-ts
 
 format:
     purs-tidy format-in-place "src/**/*.purs"
     purs-tidy format-in-place "test/**/*.purs"
-    purs-tidy format-in-place "samples/**/*.purs"
-
 
 check-format:
     purs-tidy check "src/**/*.purs"
     purs-tidy check "test/**/*.purs"
-    purs-tidy check "samples/**/*.purs"
 
 gen-ts:
     spago {{cfg_test}} run --purs-args "{{purs_args}}" --main TsBridge.Main
     yarn run prettier --write output/*/index.d.ts
 
-check-ts:
+build-ts:
     tsc
+
+build-ts-ignore:
+    tsc || echo

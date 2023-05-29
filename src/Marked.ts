@@ -1,7 +1,7 @@
 import { marked } from "marked";
-import { LexerImpl } from "../output/Marked";
+import { LexerImpl } from "../output/Marked/index";
 
-const lexerImpl: LexerImpl = (str) => {
+export const lexerImpl: LexerImpl = (str) => {
   try {
     const value = marked.lexer(str);
 
