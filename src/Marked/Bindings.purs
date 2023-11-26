@@ -1,16 +1,26 @@
 module Marked.Bindings
   ( Align
   , Blockquote
+  , Br
   , Code
+  , Codespan
+  , Def
+  , Del
+  , Em
+  , Escape
   , Heading
   , Hr
+  , Html
+  , Image
   , Link
+  , LinkRef
   , Links
   , List
   , ListItem
   , Paragraph
   , Space
   , StringLit(..)
+  , Strong
   , Table
   , TableCell
   , Text
@@ -64,18 +74,18 @@ newtype Token = Token
       , list :: List
       , list_item :: ListItem
       , paragraph :: Paragraph
-      , html :: {}
-      , text :: Text
-      , def :: {}
-      , escape :: {}
-      , tag :: {}
-      , link :: {}
-      , image :: {}
-      , strong :: {}
-      , em :: {}
-      , codespan :: {}
-      , br :: {}
-      , del :: {}
+      , html :: Html
+      -- , text :: Text
+      -- , def :: Def
+      -- , escape :: Escape
+      -- , text :: Text
+      -- , link :: Link
+      -- , image :: Image
+      -- , strong :: Strong
+      -- , em :: Em
+      -- , codespan :: Codespan
+      -- , br :: Br
+      -- , del :: Del
       )
   )
 
@@ -113,8 +123,6 @@ type Hr =
   { raw :: String
   }
 
----
-
 type Blockquote =
   { raw :: String
   , text :: String
@@ -145,13 +153,101 @@ type Paragraph = TsRecord
   , tokens :: Mod () (Array Token)
   )
 
-type Text = { text :: String }
+type Html = TsRecord
+  ( raw :: Mod () String
+  , pre :: Mod () Boolean
+  , block :: Mod () Boolean
+  , text :: Mod () String
+  , inLink :: Mod (optional :: True) Boolean
+  , inRawBlock :: Mod (optional :: True) Boolean
+  )
 
-type Links =
-  { links :: Object Link
+--   inLink: boolean;
+-- inRawBlock: boolean;
+
+type Text = TsRecord
+  ( raw :: Mod () String
+  , text :: Mod () String
+  , tokens :: Mod (optional :: True) (UndefinedOr (Array Token))
+  )
+
+--   inLink: boolean;
+-- inRawBlock: boolean;
+
+type Def =
+  { raw :: String
+  , tag :: String
+  , href :: String
+  , title :: String
   }
 
+type Escape =
+  { raw :: String
+  , text :: String
+  }
+
+-- type TagText =
+--   { raw :: String
+--   , inLink :: Boolean
+--   , inRawBlock :: Boolean
+--   , block :: Boolean
+--   , text :: String
+--   }
+
+-- type TagHtml =
+--   { raw :: String
+--   , inLink :: Boolean
+--   , inRawBlock :: Boolean
+--   , block :: Boolean
+--   , text :: String
+--   }
+
 type Link =
+  { raw :: String
+  , href :: String
+  , title :: String
+  , text :: String
+  , tokens :: Array Token
+  }
+
+type Image =
+  { raw :: String
+  , href :: String
+  , title :: String
+  , text :: String
+  }
+
+type Strong =
+  { raw :: String
+  , text :: String
+  , tokens :: Array Token
+  }
+
+type Em =
+  { raw :: String
+  , text :: String
+  , tokens :: Array Token
+  }
+
+type Codespan =
+  { raw :: String
+  , text :: String
+  }
+
+type Br =
+  { raw :: String }
+
+type Del =
+  { raw :: String
+  , text :: String
+  , tokens :: Array Token
+  }
+
+type Links =
+  { links :: Object LinkRef
+  }
+
+type LinkRef =
   { href :: Nullable String
   , title :: Nullable String
   }

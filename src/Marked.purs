@@ -21,7 +21,6 @@ import Marked.Bindings (StringLit)
 import Marked.Bindings as Bin
 import TsBridge (toRecord)
 import TsBridge.Types.Intersection as TsIntersection
-import Unsafe.Coerce (unsafeCoerce)
 import Untagged.Union (uorToMaybe)
 import Untagged.Union as UntaggedUnion
 
@@ -32,8 +31,8 @@ import Untagged.Union as UntaggedUnion
 type LexerError = String
 
 type Link =
-  { href :: Maybe String
-  , title :: Maybe String
+  { href :: String
+  , title :: String
   }
 
 data Token
@@ -42,15 +41,15 @@ data Token
   | TokHeading Heading
   | TokTable Table
   | TokHr Hr
-  | TokBlockquote {}
-  | TokList {}
-  | TokListItem {}
-  | TokParagraph { tokens :: Array Token }
-  | TokHtml {}
+  | TokBlockquote Blockquote
+  | TokList List
+  | TokListItem ListItem
+  | TokParagraph Paragraph
+  | TokHtml Html
   | TokText { text :: String }
   | TokDef {}
   | TokEscape {}
-  | TokTag {}
+  -- | TokTag {}
   | TokImage {}
   | TokLink {}
   | TokStrong {}
@@ -86,17 +85,59 @@ type Table =
 
 data TableAlign = AlignCenter | AlignLeft | AlignRight
 
-data ListItem = ListItem
+type ListItem =
+  { raw :: String
+  , task :: Boolean
+  , checked :: Boolean
+  , loose :: Boolean
+  , text :: String
+  , tokens :: Array Token
+  }
+
+type Paragraph =
+  { raw :: String
+  , pre :: Boolean
+  , text :: String
+  , tokens :: Array Token
+  }
+
+type Html =
+  { raw :: String
+  , pre :: Boolean
+  , block :: Boolean
+  , text :: String
+  , inLink :: Boolean
+  , inRawBlock :: Boolean
+  }
 
 type TableCell = { text :: String, tokens :: Array Token }
 
-type Hr = {
-  raw :: String
-}
+type Hr =
+  { raw :: String
+  }
+
+type Blockquote =
+  { raw :: String
+  , text :: String
+  , tokens :: Array Token
+  }
+
+type List =
+  { raw :: String
+  , ordered :: Boolean
+  , start :: Maybe Int
+  , loose :: Boolean
+  , items :: Array ListItem
+  }
+
+type LinkRef =
+  { href :: Maybe String
+  , title :: Maybe String
+  }
 
 -------------------------------------------------------------------------------
 
-lexer :: String -> Either LexerError { tokens :: Array Token, links :: Map String Link }
+lexer :: String -> Either LexerError { tokens :: Array Token, links :: Map String LinkRef }
 lexer str =
   let
     result = LD.fromVariant $ Bin.lexer str
@@ -108,18 +149,11 @@ lexer str =
         , links:
             links
               # (Object.toUnfoldable :: _ -> Array _)
-              # map (map linkFromImpl)
+              # map (map linkRefFromImpl)
               # Map.fromFoldable
         }
 
 -------------------------------------------------------------------------------
-
-linkFromImpl :: Bin.Link -> Link
-linkFromImpl l =
-  { href: Nullable.toMaybe l.href
-  , title:
-      Nullable.toMaybe l.title
-  }
 
 tokenFromImpl :: Bin.Token -> Token
 tokenFromImpl =
@@ -154,38 +188,69 @@ tokenFromImpl =
                 }
           , hr: \r ->
               TokHr r
-          , blockquote: \_ ->
-              TokBlockquote {}
-          , list: \_ ->
-              TokList {}
-          , list_item: \_ ->
-              TokListItem {}
-          , paragraph: toRecord >>> \{ tokens } ->
-              TokParagraph { tokens: map tokenFromImpl tokens }
-          , html: \_ ->
-              TokHtml {}
-          , text: \{ text } ->
-              TokText { text }
-          , def: \_ ->
-              TokDef {}
-          , escape: \_ ->
-              TokEscape {}
-          , tag: \_ ->
-              TokTag {}
-          , link: \_ ->
-              TokLink {}
-          , image: \_ ->
-              TokImage {}
-          , strong: \_ ->
-              TokStrong {}
-          , em: \_ ->
-              TokEm {}
-          , codespan: \_ ->
-              TokCodespan {}
-          , br: \_ ->
-              TokBr {}
-          , del: \_ ->
-              TokDel {}
+          , blockquote: \{ raw, text, tokens } ->
+              TokBlockquote
+                { raw
+                , text
+                , tokens: map tokenFromImpl tokens
+                }
+          , list: \{ raw, ordered, start, loose, items } ->
+              TokList
+                { raw
+                , ordered
+                , start: case UntaggedUnion.toEither1 start of
+                    Left (n :: Number) -> Just $ fromMaybe 0 $ Int.fromNumber n
+                    Right (_ :: StringLit "") -> Nothing
+                , loose
+                , items: map listItemFromImpl items
+                }
+          , list_item: \r ->
+              TokListItem $ listItemFromImpl r
+          , paragraph: toRecord >>> \{ raw, pre, text, tokens } ->
+              TokParagraph
+                { raw
+                , pre: case pre of
+                    Just u -> case uorToMaybe u of
+                      Just bool -> bool
+                      Nothing -> false
+                    Nothing -> false
+                , text
+                , tokens: map tokenFromImpl tokens
+                }
+          , html: toRecord >>> \{ raw, pre, block, text, inLink, inRawBlock } ->
+              TokHtml
+                { raw
+                , pre
+                , block
+                , text
+                , inLink: case inLink of
+                    Just bool -> bool
+                    Nothing -> false
+                , inRawBlock: case inRawBlock of
+                    Just bool -> bool
+                    Nothing -> false
+                }
+          -- , text: unsafeCoerce ""
+          -- , def: \_ ->
+          --     TokDef {}
+          -- , escape: \_ ->
+          --     TokEscape {}
+          -- -- , tag: \_ ->
+          -- --     TokTag {}
+          -- , link: \_ ->
+          --     TokLink {}
+          -- , image: \_ ->
+          --     TokImage {}
+          -- , strong: \_ ->
+          --     TokStrong {}
+          -- , em: \_ ->
+          --     TokEm {}
+          -- , codespan: \_ ->
+          --     TokCodespan {}
+          -- , br: \_ ->
+          --     TokBr {}
+          -- , del: \_ ->
+          --     TokDel {}
           }
       )
 
@@ -205,27 +270,48 @@ tableCellFromImpl { text, tokens } =
   , tokens: map tokenFromImpl tokens
   }
 
+linkFromImpl :: Bin.Link -> Link
+linkFromImpl { href, title } =
+  { href
+  , title
+  }
+
+linkRefFromImpl :: Bin.LinkRef -> LinkRef
+linkRefFromImpl { href, title } =
+  { href: Nullable.toMaybe href
+  , title: Nullable.toMaybe title
+  }
+
+listItemFromImpl :: Bin.ListItem -> ListItem
+listItemFromImpl = toRecord >>> \{ raw, task, checked, loose, text, tokens } ->
+  { raw
+  , task
+  , checked: case checked of
+      Just u -> case uorToMaybe u of
+        Just bool -> bool
+        Nothing -> false
+      Nothing -> false
+  , loose
+  , text
+  , tokens: map tokenFromImpl tokens
+  }
+
 -------------------------------------------------------------------------------
 --- Instances
 -------------------------------------------------------------------------------
 
 derive instance Generic Token _
 derive instance Generic TableAlign _
-derive instance Generic ListItem _
 derive instance Generic CodeBlockStyle _
 
 derive instance Eq Token
 derive instance Eq TableAlign
-derive instance Eq ListItem
 derive instance Eq CodeBlockStyle
 
 instance Show Token where
   show x = genericShow x
 
 instance Show TableAlign where
-  show = genericShow
-
-instance Show ListItem where
   show = genericShow
 
 instance Show CodeBlockStyle where
