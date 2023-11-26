@@ -2,18 +2,23 @@ module Marked where
 
 import Prelude
 
-import Data.Either (Either)
+import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
 import Data.Int as Int
+import Data.Map (Map)
+import Data.Map as Map
 import Data.Maybe (Maybe, fromMaybe)
 import Data.Newtype (un)
+import Data.Nullable as Nullable
 import Data.Show.Generic (genericShow)
+import Data.Tuple (Tuple(..))
 import Data.Variant as V
 import Data.Variant.Encodings.Flat as VF
+import Foreign.Object as Object
 import LabeledData.VariantLike.Class as LD
 import Marked.Bindings as Bin
 import TsBridge (toRecord)
-import TsBridge as ITS
+import TsBridge.Types.Intersection as TsIntersection
 import Untagged.Union (uorToMaybe)
 
 -------------------------------------------------------------------------------
@@ -21,6 +26,11 @@ import Untagged.Union (uorToMaybe)
 -------------------------------------------------------------------------------
 
 type LexerError = String
+
+type Link =
+  { href :: Maybe String
+  , title :: Maybe String
+  }
 
 data Token
   = TokSpace
@@ -53,10 +63,30 @@ data AlignTable = AlignCenter | AlignLeft | AlignRight
 
 -------------------------------------------------------------------------------
 
-lexer :: String -> Either LexerError (Array Token)
-lexer = Bin.lexer >>> LD.fromVariant >>> map (ITS.fst >>> map (tokenFromImpl))
+lexer :: String -> Either LexerError { tokens :: Array Token, links :: Map String Link }
+lexer str =
+  let
+    result = LD.fromVariant $ Bin.lexer str
+  in
+    case result of
+      Left err -> Left err
+      Right val | (Tuple tokens { links }) <- TsIntersection.toTuple val -> Right
+        { tokens: map tokenFromImpl tokens
+        , links:
+            links
+              # (Object.toUnfoldable :: _ -> Array _)
+              # map (map linkFromImpl)
+              # Map.fromFoldable
+        }
 
 -------------------------------------------------------------------------------
+
+linkFromImpl :: Bin.Link -> Link
+linkFromImpl l =
+  { href: Nullable.toMaybe l.href
+  , title:
+      Nullable.toMaybe l.title
+  }
 
 tokenFromImpl :: Bin.Token -> Token
 tokenFromImpl =

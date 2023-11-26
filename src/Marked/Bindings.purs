@@ -67,11 +67,12 @@ type Paragraph = { tokens :: Array Token, text :: String }
 type Text = { text :: String }
 
 type Links =
-  { links ::
-      Object
-        { href :: Nullable String
-        , title :: Nullable String
-        }
+  { links :: Object Link
+  }
+
+type Link =
+  { href :: Nullable String
+  , title :: Nullable String
   }
 
 foreign import lexer :: String -> EitherV String (Array Token |&| Links)
