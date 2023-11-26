@@ -46,17 +46,18 @@ data Token
   | TokListItem ListItem
   | TokParagraph Paragraph
   | TokHtml Html
-  | TokText { text :: String }
-  | TokDef {}
-  | TokEscape {}
-  -- | TokTag {}
-  | TokImage {}
-  | TokLink {}
-  | TokStrong {}
-  | TokEm {}
-  | TokCodespan {}
-  | TokBr {}
-  | TokDel {}
+  | TokText Text
+
+-- | TokDef {}
+-- | TokEscape {}
+-- -- | TokTag {}
+-- | TokImage {}
+-- | TokLink {}
+-- | TokStrong {}
+-- | TokEm {}
+-- | TokCodespan {}
+-- | TokBr {}
+-- | TokDel {}
 
 type Code =
   { raw :: String
@@ -106,6 +107,14 @@ type Html =
   , pre :: Boolean
   , block :: Boolean
   , text :: String
+  , inLink :: Boolean
+  , inRawBlock :: Boolean
+  }
+
+type Text =
+  { raw :: String
+  , text :: String
+  , tokens :: Maybe (Array Token)
   , inLink :: Boolean
   , inRawBlock :: Boolean
   }
@@ -230,7 +239,22 @@ tokenFromImpl =
                     Just bool -> bool
                     Nothing -> false
                 }
-          -- , text: unsafeCoerce ""
+          , text: toRecord >>> \{ raw, text, tokens, inLink, inRawBlock } ->
+              TokText
+                { raw
+                , text
+                , tokens: case tokens of
+                    Just u -> case uorToMaybe u of
+                      Just arr -> Just $ map tokenFromImpl arr
+                      Nothing -> Nothing
+                    Nothing -> Nothing
+                , inLink: case inLink of
+                    Just bool -> bool
+                    Nothing -> false
+                , inRawBlock: case inRawBlock of
+                    Just bool -> bool
+                    Nothing -> false
+                }
           -- , def: \_ ->
           --     TokDef {}
           -- , escape: \_ ->

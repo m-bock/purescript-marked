@@ -75,7 +75,7 @@ newtype Token = Token
       , list_item :: ListItem
       , paragraph :: Paragraph
       , html :: Html
-      -- , text :: Text
+      , text :: Text
       -- , def :: Def
       -- , escape :: Escape
       -- , text :: Text
@@ -162,17 +162,13 @@ type Html = TsRecord
   , inRawBlock :: Mod (optional :: True) Boolean
   )
 
---   inLink: boolean;
--- inRawBlock: boolean;
-
 type Text = TsRecord
   ( raw :: Mod () String
   , text :: Mod () String
   , tokens :: Mod (optional :: True) (UndefinedOr (Array Token))
+  , inLink :: Mod (optional :: True) Boolean
+  , inRawBlock :: Mod (optional :: True) Boolean
   )
-
---   inLink: boolean;
--- inRawBlock: boolean;
 
 type Def =
   { raw :: String
@@ -185,22 +181,6 @@ type Escape =
   { raw :: String
   , text :: String
   }
-
--- type TagText =
---   { raw :: String
---   , inLink :: Boolean
---   , inRawBlock :: Boolean
---   , block :: Boolean
---   , text :: String
---   }
-
--- type TagHtml =
---   { raw :: String
---   , inLink :: Boolean
---   , inRawBlock :: Boolean
---   , block :: Boolean
---   , text :: String
---   }
 
 type Link =
   { raw :: String
