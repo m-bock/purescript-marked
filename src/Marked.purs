@@ -30,11 +30,6 @@ import Untagged.Union as UntaggedUnion
 
 type LexerError = String
 
-type Link =
-  { href :: String
-  , title :: String
-  }
-
 data Token
   = TokSpace
   | TokCode Code
@@ -47,17 +42,15 @@ data Token
   | TokParagraph Paragraph
   | TokHtml Html
   | TokText Text
-
--- | TokDef {}
--- | TokEscape {}
--- -- | TokTag {}
--- | TokImage {}
--- | TokLink {}
--- | TokStrong {}
--- | TokEm {}
--- | TokCodespan {}
--- | TokBr {}
--- | TokDel {}
+  | TokDef Def
+  | TokEscape Escape
+  | TokLink Link
+  | TokImage Image
+  | TokStrong Strong
+  | TokEm Em
+  | TokCodespan Codespan
+  | TokBr Br
+  | TokDel Del
 
 type Code =
   { raw :: String
@@ -117,6 +110,59 @@ type Text =
   , tokens :: Maybe (Array Token)
   , inLink :: Boolean
   , inRawBlock :: Boolean
+  }
+
+type Def =
+  { raw :: String
+  , tag :: String
+  , href :: String
+  , title :: String
+  }
+
+type Escape =
+  { raw :: String
+  , text :: String
+  }
+
+type Link =
+  { raw :: String
+  , href :: String
+  , title :: String
+  , text :: String
+  , tokens :: Array Token
+  }
+
+type Image =
+  { raw :: String
+  , href :: String
+  , title :: String
+  , text :: String
+  }
+
+type Strong =
+  { raw :: String
+  , text :: String
+  , tokens :: Array Token
+  }
+
+type Em =
+  { raw :: String
+  , text :: String
+  , tokens :: Array Token
+  }
+
+type Codespan =
+  { raw :: String
+  , text :: String
+  }
+
+type Br =
+  { raw :: String }
+
+type Del =
+  { raw :: String
+  , text :: String
+  , tokens :: Array Token
   }
 
 type TableCell = { text :: String, tokens :: Array Token }
@@ -255,26 +301,37 @@ tokenFromImpl =
                     Just bool -> bool
                     Nothing -> false
                 }
-          -- , def: \_ ->
-          --     TokDef {}
-          -- , escape: \_ ->
-          --     TokEscape {}
-          -- -- , tag: \_ ->
-          -- --     TokTag {}
-          -- , link: \_ ->
-          --     TokLink {}
-          -- , image: \_ ->
-          --     TokImage {}
-          -- , strong: \_ ->
-          --     TokStrong {}
-          -- , em: \_ ->
-          --     TokEm {}
-          -- , codespan: \_ ->
-          --     TokCodespan {}
-          -- , br: \_ ->
-          --     TokBr {}
-          -- , del: \_ ->
-          --     TokDel {}
+          , def: \r ->
+              TokDef r
+          , escape: \r ->
+              TokEscape r
+
+          , link: \r ->
+              TokLink $ linkFromImpl r
+          , image: \r ->
+              TokImage r
+          , strong: \{ raw, text, tokens } ->
+              TokStrong
+                { raw
+                , text
+                , tokens: map tokenFromImpl tokens
+                }
+          , em: \{ raw, text, tokens } ->
+              TokEm
+                { raw
+                , text
+                , tokens: map tokenFromImpl tokens
+                }
+          , codespan: \r ->
+              TokCodespan r
+          , br: \r ->
+              TokBr r
+          , del: \{ raw, text, tokens } ->
+              TokDel
+                { raw
+                , text
+                , tokens: map tokenFromImpl tokens
+                }
           }
       )
 
@@ -295,9 +352,12 @@ tableCellFromImpl { text, tokens } =
   }
 
 linkFromImpl :: Bin.Link -> Link
-linkFromImpl { href, title } =
-  { href
+linkFromImpl { raw, href, title, text, tokens } =
+  { raw
+  , href
   , title
+  , text
+  , tokens: map tokenFromImpl tokens
   }
 
 linkRefFromImpl :: Bin.LinkRef -> LinkRef

@@ -76,16 +76,15 @@ newtype Token = Token
       , paragraph :: Paragraph
       , html :: Html
       , text :: Text
-      -- , def :: Def
-      -- , escape :: Escape
-      -- , text :: Text
-      -- , link :: Link
-      -- , image :: Image
-      -- , strong :: Strong
-      -- , em :: Em
-      -- , codespan :: Codespan
-      -- , br :: Br
-      -- , del :: Del
+      , def :: Def
+      , escape :: Escape
+      , link :: Link
+      , image :: Image
+      , strong :: Strong
+      , em :: Em
+      , codespan :: Codespan
+      , br :: Br
+      , del :: Del
       )
   )
 
