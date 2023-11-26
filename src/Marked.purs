@@ -7,7 +7,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Int as Int
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe, fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (un)
 import Data.Nullable as Nullable
 import Data.Show.Generic (genericShow)
@@ -16,10 +16,14 @@ import Data.Variant as V
 import Data.Variant.Encodings.Flat as VF
 import Foreign.Object as Object
 import LabeledData.VariantLike.Class as LD
+import Literals.Null (Null)
+import Marked.Bindings (StringLit)
 import Marked.Bindings as Bin
 import TsBridge (toRecord)
 import TsBridge.Types.Intersection as TsIntersection
+import Unsafe.Coerce (unsafeCoerce)
 import Untagged.Union (uorToMaybe)
+import Untagged.Union as UntaggedUnion
 
 -------------------------------------------------------------------------------
 --- Types
@@ -34,10 +38,10 @@ type Link =
 
 data Token
   = TokSpace
-  | TokCode { text :: String, lang :: Maybe String }
-  | TokHeading { depth :: Int, tokens :: Array Token }
-  | TokTable {}
-  | TokHr {}
+  | TokCode Code
+  | TokHeading Heading
+  | TokTable Table
+  | TokHr Hr
   | TokBlockquote {}
   | TokList {}
   | TokListItem {}
@@ -55,11 +59,40 @@ data Token
   | TokBr {}
   | TokDel {}
 
+type Code =
+  { raw :: String
+  , codeBlockStyle :: CodeBlockStyle
+  , text :: String
+  , lang :: Maybe String
+  }
+
+data CodeBlockStyle
+  = Indented
+  | Fenced
+
+type Heading =
+  { raw :: String
+  , depth :: Int
+  , text :: String
+  , tokens :: Array Token
+  }
+
+type Table =
+  { raw :: String
+  , align :: Array TableAlign
+  , header :: Array TableCell
+  , rows :: Array (Array TableCell)
+  }
+
+data TableAlign = AlignCenter | AlignLeft | AlignRight
+
 data ListItem = ListItem
 
-data TableCell = TableCell { text :: String, tokens :: Array Token }
+type TableCell = { text :: String, tokens :: Array Token }
 
-data AlignTable = AlignCenter | AlignLeft | AlignRight
+type Hr = {
+  raw :: String
+}
 
 -------------------------------------------------------------------------------
 
@@ -96,20 +129,31 @@ tokenFromImpl =
       ( V.case_ # V.onMatch
           { space: \_ ->
               TokSpace
-          , code: toRecord >>> \{ text, lang } ->
+          , code: toRecord >>> \{ raw, codeBlockStyle, text, lang } ->
               TokCode
-                { text
+                { raw
+                , codeBlockStyle: case codeBlockStyle of
+                    Just val | Just _ <- uorToMaybe val -> Indented
+                    _ -> Fenced
+                , text
                 , lang: lang >>= uorToMaybe
                 }
-          , heading: \{ depth, tokens } ->
+          , heading: \{ raw, depth, text, tokens } ->
               TokHeading
-                { depth: fromMaybe 0 $ Int.fromNumber depth
+                { raw
+                , depth: fromMaybe 0 $ Int.fromNumber depth
+                , text
                 , tokens: map tokenFromImpl tokens
                 }
-          , table: \_ ->
-              TokTable {}
-          , hr: \_ ->
-              TokHr {}
+          , table: \{ raw, align, header, rows } ->
+              TokTable
+                { raw
+                , align: map alignFromImpl align
+                , header: map tableCellFromImpl header
+                , rows: map (map tableCellFromImpl) rows
+                }
+          , hr: \r ->
+              TokHr r
           , blockquote: \_ ->
               TokBlockquote {}
           , list: \_ ->
@@ -145,29 +189,44 @@ tokenFromImpl =
           }
       )
 
+alignFromImpl :: Bin.Align -> TableAlign
+alignFromImpl al1 =
+  case UntaggedUnion.toEither1 al1 of
+    Left (_ :: StringLit "center") -> AlignCenter
+    Right al2 -> case UntaggedUnion.toEither1 al2 of
+      Left (_ :: StringLit "left") -> AlignLeft
+      Right al3 -> case UntaggedUnion.toEither1 al3 of
+        Left (_ :: StringLit "right") -> AlignRight
+        Right (_ :: Null) -> AlignLeft
+
+tableCellFromImpl :: Bin.TableCell -> TableCell
+tableCellFromImpl { text, tokens } =
+  { text
+  , tokens: map tokenFromImpl tokens
+  }
+
 -------------------------------------------------------------------------------
 --- Instances
 -------------------------------------------------------------------------------
 
 derive instance Generic Token _
-derive instance Generic TableCell _
-derive instance Generic AlignTable _
+derive instance Generic TableAlign _
 derive instance Generic ListItem _
+derive instance Generic CodeBlockStyle _
 
 derive instance Eq Token
-derive instance Eq TableCell
-derive instance Eq AlignTable
+derive instance Eq TableAlign
 derive instance Eq ListItem
+derive instance Eq CodeBlockStyle
 
 instance Show Token where
   show x = genericShow x
 
-instance Show TableCell where
-  show x = genericShow x
-
-instance Show AlignTable where
+instance Show TableAlign where
   show = genericShow
 
 instance Show ListItem where
   show = genericShow
 
+instance Show CodeBlockStyle where
+  show x = genericShow x

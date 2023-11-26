@@ -1,5 +1,6 @@
 module Marked.Bindings
-  ( Blockquote
+  ( Align
+  , Blockquote
   , Code
   , Heading
   , Hr
@@ -9,6 +10,7 @@ module Marked.Bindings
   , ListItem
   , Paragraph
   , Space
+  , StringLit(..)
   , Table
   , TableCell
   , Text
@@ -17,20 +19,35 @@ module Marked.Bindings
   , tsModules
   ) where
 
+import Prelude
+
 import DTS as DTS
 import Data.Either (Either)
 import Data.Newtype (class Newtype)
 import Data.Nullable (Nullable)
+import Data.Symbol (class IsSymbol, reflectSymbol)
 import Data.Variant.Encodings.Flat (VariantEncodedFlat)
 import Foreign.Object (Object)
 import LabeledData.VariantLike.Class (EitherV)
-import Literals (StringLit)
+import Literals as Literals
 import Literals.Null (Null)
 import Prim.Boolean (True)
 import TsBridge (type (|&|), Mod, TsRecord)
 import TsBridge as TSB
 import TsBridge.Class (class TsBridge, Tok(..))
+import Type.Proxy (Proxy(..))
+import Unsafe.Coerce (unsafeCoerce)
+import Untagged.TypeCheck (class HasRuntimeType)
 import Untagged.Union (type (|+|), UndefinedOr)
+
+newtype StringLit a = StringLit (Literals.StringLit a)
+
+instance IsSymbol sym => TsBridge (StringLit sym) where
+  tsBridge _ = TSB.tsBridge (Proxy :: _ (Literals.StringLit sym))
+
+instance IsSymbol sym => HasRuntimeType (StringLit sym) where
+  hasRuntimeType _ val =
+    (unsafeCoerce val :: String) == reflectSymbol (Proxy :: _ sym)
 
 -------------------------------------------------------------------------------
 --- FFI
@@ -80,12 +97,12 @@ type Heading =
 
 type Table =
   { raw :: String
-  , align ::
-      Array
-        (StringLit "center" |+| StringLit "left" |+| StringLit "right" |+| Null)
+  , align :: Array Align
   , header :: Array TableCell
   , rows :: Array (Array TableCell)
   }
+
+type Align = StringLit "center" |+| StringLit "left" |+| StringLit "right" |+| Null
 
 type TableCell =
   { text :: String
@@ -95,6 +112,8 @@ type TableCell =
 type Hr =
   { raw :: String
   }
+
+---
 
 type Blockquote =
   { raw :: String
