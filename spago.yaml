@@ -1,0 +1,33 @@
+package:
+  dependencies:
+    [
+      "console",
+      "dts",
+      "effect",
+      "either",
+      "foreign-object",
+      "integers",
+      "labeled-data",
+      "literals",
+      "maybe",
+      "newtype",
+      "nullable",
+      "prelude",
+      "ts-bridge",
+      "unsafe-coerce",
+      "untagged-union",
+      "variant",
+      "variant-encodings",
+    ]
+  name: marked
+  test:
+    dependencies:
+      [ "spec"
+      ]
+    main: Test.Main
+workspace:
+  extra_packages:
+    ts-bridge: 2.3.0
+    dts: 0.3.0
+  package_set:
+    registry: 46.2.0

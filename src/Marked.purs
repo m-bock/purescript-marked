@@ -2,24 +2,19 @@ module Marked where
 
 import Prelude
 
-import DTS as DTS
 import Data.Either (Either)
 import Data.Generic.Rep (class Generic)
 import Data.Int as Int
 import Data.Maybe (Maybe, fromMaybe)
-import Data.Newtype (class Newtype, un)
+import Data.Newtype (un)
 import Data.Show.Generic (genericShow)
 import Data.Variant as V
-import Data.Variant.Encodings.Flat (VariantEncodedFlat)
 import Data.Variant.Encodings.Flat as VF
-import LabeledData.VariantLike.Class (EitherV)
 import LabeledData.VariantLike.Class as LD
-import Prim.Boolean (True)
-import TsBridge (Mod, TsRecord, toRecord)
-import TsBridge as TSB
-import TsBridge.Class (class TsBridge, Tok(..))
-import Type.Proxy (Proxy(..))
-import Untagged.Union (UndefinedOr, uorToMaybe)
+import Marked.Bindings as Bin
+import TsBridge (toRecord)
+import TsBridge as ITS
+import Untagged.Union (uorToMaybe)
 
 -------------------------------------------------------------------------------
 --- Types
@@ -59,13 +54,13 @@ data AlignTable = AlignCenter | AlignLeft | AlignRight
 -------------------------------------------------------------------------------
 
 lexer :: String -> Either LexerError (Array Token)
-lexer = lexerImpl >>> LD.fromVariant >>> map (map tokenFromImpl)
+lexer = Bin.lexer >>> LD.fromVariant >>> map (ITS.fst >>> map (tokenFromImpl))
 
 -------------------------------------------------------------------------------
 
-tokenFromImpl :: TokenImpl -> Token
+tokenFromImpl :: Bin.Token -> Token
 tokenFromImpl =
-  un TokenImpl
+  un Bin.Token
     >>> VF.normalizeEncodingFlat
     >>>
       ( V.case_ # V.onMatch
@@ -121,53 +116,6 @@ tokenFromImpl =
       )
 
 -------------------------------------------------------------------------------
---- FFI
--------------------------------------------------------------------------------
-
-newtype TokenImpl = TokenImpl (VariantEncodedFlat "type" TokenRow)
-
-instance TsBridge TokenImpl where
-  tsBridge x = TSB.tsBridgeNewtype
-    Tok
-    { moduleName
-    , typeName: "TokenImpl"
-    , typeArgs: []
-    }
-    x
-
-type TokenRow =
-  ( space :: {}
-  , code ::
-      TsRecord
-        ( lang :: Mod (optional :: True) (UndefinedOr String)
-        , text :: Mod () String
-        )
-  , heading :: { depth :: Number, tokens :: Array TokenImpl }
-  , table :: {}
-  , hr :: {}
-  , blockquote :: {}
-  , list :: {}
-  , list_item :: {}
-  , paragraph :: { tokens :: Array TokenImpl }
-  , html :: {}
-  , text :: { text :: String }
-  , def :: {}
-  , escape :: {}
-  , tag :: {}
-  , link :: {}
-  , image :: {}
-  , strong :: {}
-  , em :: {}
-  , codespan :: {}
-  , br :: {}
-  , del :: {}
-  )
-
-type LexerImpl = String -> EitherV String (Array TokenImpl)
-
-foreign import lexerImpl :: LexerImpl
-
--------------------------------------------------------------------------------
 --- Instances
 -------------------------------------------------------------------------------
 
@@ -176,7 +124,6 @@ derive instance Generic TableCell _
 derive instance Generic AlignTable _
 derive instance Generic ListItem _
 
-derive instance Newtype TokenImpl _
 derive instance Eq Token
 derive instance Eq TableCell
 derive instance Eq AlignTable
@@ -194,15 +141,3 @@ instance Show AlignTable where
 instance Show ListItem where
   show = genericShow
 
--------------------------------------------------------------------------------
---- TsBridge
--------------------------------------------------------------------------------
-
-moduleName :: String
-moduleName = "Marked"
-
-tsModules :: Either TSB.AppError (Array DTS.TsModuleFile)
-tsModules =
-  TSB.tsModuleFile moduleName
-    [ TSB.tsTypeAlias Tok "LexerImpl" (Proxy :: _ LexerImpl)
-    ]
