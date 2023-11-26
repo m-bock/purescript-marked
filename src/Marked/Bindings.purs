@@ -1,4 +1,21 @@
-module Marked.Bindings where
+module Marked.Bindings
+  ( Blockquote
+  , Code
+  , Heading
+  , Hr
+  , Link
+  , Links
+  , List
+  , ListItem
+  , Paragraph
+  , Space
+  , Table
+  , TableCell
+  , Text
+  , Token(..)
+  , lexer
+  , tsModules
+  ) where
 
 import DTS as DTS
 import Data.Either (Either)
@@ -21,14 +38,14 @@ import Untagged.Union (type (|+|), UndefinedOr)
 
 newtype Token = Token
   ( VariantEncodedFlat "type"
-      ( space :: {}
+      ( space :: Space
       , code :: Code
       , heading :: Heading
       , table :: Table
-      , hr :: {}
+      , hr :: Hr
       , blockquote :: Blockquote
       , list :: List
-      , list_item :: {}
+      , list_item :: ListItem
       , paragraph :: Paragraph
       , html :: {}
       , text :: Text
@@ -45,24 +62,69 @@ newtype Token = Token
       )
   )
 
+type Space = { raw :: String }
+
 type Code = TsRecord
-  ( lang :: Mod (optional :: True) (UndefinedOr String)
+  ( raw :: Mod () String
+  , codeBlockStyle :: Mod (optional :: True) (UndefinedOr (StringLit "indented"))
+  , lang :: Mod (optional :: True) (UndefinedOr String)
   , text :: Mod () String
   )
 
-type Heading = { depth :: Number, tokens :: Array Token }
-
-type Table =
-  { align ::
-      Array
-        (StringLit "center" |+| StringLit "left" |+| StringLit "right" |+| Null)
+type Heading =
+  { raw :: String
+  , depth :: Number
+  , text :: String
+  , tokens :: Array Token
   }
 
-type Blockquote = { text :: String, tokens :: Array Token }
+type Table =
+  { raw :: String
+  , align ::
+      Array
+        (StringLit "center" |+| StringLit "left" |+| StringLit "right" |+| Null)
+  , header :: Array TableCell
+  , rows :: Array (Array TableCell)
+  }
 
-type List = { ordered :: Boolean }
+type TableCell =
+  { text :: String
+  , tokens :: Array Token
+  }
 
-type Paragraph = { tokens :: Array Token, text :: String }
+type Hr =
+  { raw :: String
+  }
+
+type Blockquote =
+  { raw :: String
+  , text :: String
+  , tokens :: Array Token
+  }
+
+type List =
+  { raw :: String
+  , ordered :: Boolean
+  , start :: Number |+| (StringLit "")
+  , loose :: Boolean
+  , items :: Array ListItem
+  }
+
+type ListItem = TsRecord
+  ( raw :: Mod () String
+  , task :: Mod () Boolean
+  , checked :: Mod (optional :: True) (UndefinedOr Boolean)
+  , loose :: Mod () Boolean
+  , text :: Mod () String
+  , tokens :: Mod () (Array Token)
+  )
+
+type Paragraph = TsRecord
+  ( raw :: Mod () String
+  , pre :: Mod (optional :: True) (UndefinedOr Boolean)
+  , text :: Mod () String
+  , tokens :: Mod () (Array Token)
+  )
 
 type Text = { text :: String }
 

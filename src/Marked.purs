@@ -116,7 +116,7 @@ tokenFromImpl =
               TokList {}
           , list_item: \_ ->
               TokListItem {}
-          , paragraph: \{ tokens } ->
+          , paragraph: toRecord >>> \{ tokens } ->
               TokParagraph { tokens: map tokenFromImpl tokens }
           , html: \_ ->
               TokHtml {}
