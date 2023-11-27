@@ -1,6 +1,7 @@
 module Marked.Bindings
   ( Align
   , Blockquote
+  , BooleanLit
   , Br
   , Code
   , Codespan
@@ -17,17 +18,21 @@ module Marked.Bindings
   , Links
   , List
   , ListItem
+  , LitWrap(..)
   , Paragraph
   , Space
-  , StringLit(..)
+  , StringLit
   , Strong
   , Table
   , TableCell
+  , Tag
   , Text
   , Token(..)
+  , UnionWrap(..)
   , lexer
   , tsModules
-  ) where
+  )
+  where
 
 import Prelude
 
@@ -36,9 +41,10 @@ import Data.Either (Either)
 import Data.Newtype (class Newtype)
 import Data.Nullable (Nullable)
 import Data.Symbol (class IsSymbol, reflectSymbol)
-import Data.Variant.Encodings.Flat (VariantEncodedFlat)
+import Data.Variant.Encodings.Flat (class IsRecordWithoutKey, VariantEncodedFlat)
 import Foreign.Object (Object)
 import LabeledData.VariantLike.Class (EitherV)
+import Literals (Literal)
 import Literals as Literals
 import Literals.Null (Null)
 import Prim.Boolean (True)
@@ -50,14 +56,37 @@ import Unsafe.Coerce (unsafeCoerce)
 import Untagged.TypeCheck (class HasRuntimeType)
 import Untagged.Union (type (|+|), UndefinedOr)
 
-newtype StringLit a = StringLit (Literals.StringLit a)
+newtype LitWrap a = LitWrap a
 
-instance IsSymbol sym => TsBridge (StringLit sym) where
-  tsBridge _ = TSB.tsBridge (Proxy :: _ (Literals.StringLit sym))
+derive newtype instance TsBridge a => TsBridge (LitWrap a)
 
-instance IsSymbol sym => HasRuntimeType (StringLit sym) where
+instance IsSymbol sym => HasRuntimeType (LitWrap (Literal String sym)) where
   hasRuntimeType _ val =
-    (unsafeCoerce val :: String) == reflectSymbol (Proxy :: _ sym)
+    unsafeCoerce val == reflectSymbol (Proxy :: _ sym)
+
+instance HasRuntimeType (LitWrap (Literal Boolean "true")) where
+  hasRuntimeType _ val =
+    unsafeCoerce val == true
+
+instance HasRuntimeType (LitWrap (Literal Boolean "false")) where
+  hasRuntimeType _ val =
+    unsafeCoerce val == false
+
+type StringLit sym = LitWrap (Literals.StringLit sym)
+
+type BooleanLit b = LitWrap (Literals.BooleanLit b)
+
+newtype UnionWrap a = UnionWrap a
+
+derive newtype instance TsBridge a => TsBridge (UnionWrap a)
+
+instance
+  ( IsRecordWithoutKey sym a
+  , IsRecordWithoutKey sym b
+  ) =>
+  IsRecordWithoutKey sym (UnionWrap (a |+| b))
+  where
+  isRecordWithoutKey _ = Proxy
 
 -------------------------------------------------------------------------------
 --- FFI
@@ -74,8 +103,8 @@ newtype Token = Token
       , list :: List
       , list_item :: ListItem
       , paragraph :: Paragraph
-      , html :: Html
-      , text :: Text
+      , html :: UnionWrap (Tag |+| Html)
+      , text :: UnionWrap (Tag |+| Text)
       , def :: Def
       , escape :: Escape
       , link :: Link
@@ -152,22 +181,26 @@ type Paragraph = TsRecord
   , tokens :: Mod () (Array Token)
   )
 
-type Html = TsRecord
-  ( raw :: Mod () String
-  , pre :: Mod () Boolean
-  , block :: Mod () Boolean
-  , text :: Mod () String
-  , inLink :: Mod (optional :: True) Boolean
-  , inRawBlock :: Mod (optional :: True) Boolean
-  )
+type Html =
+  { raw :: String
+  , pre :: Boolean
+  , block :: BooleanLit "true"
+  , text :: String
+  }
 
 type Text = TsRecord
   ( raw :: Mod () String
   , text :: Mod () String
   , tokens :: Mod (optional :: True) (UndefinedOr (Array Token))
-  , inLink :: Mod (optional :: True) Boolean
-  , inRawBlock :: Mod (optional :: True) Boolean
   )
+
+type Tag =
+  { raw :: String
+  , inLink :: Boolean
+  , inRawBlock :: Boolean
+  , block :: BooleanLit "false"
+  , text :: String
+  }
 
 type Def =
   { raw :: String
@@ -184,7 +217,7 @@ type Escape =
 type Link =
   { raw :: String
   , href :: String
-  , title :: String
+  , title :: Nullable String -- in TS wrongly defined as String
   , text :: String
   , tokens :: Array Token
   }
@@ -192,7 +225,7 @@ type Link =
 type Image =
   { raw :: String
   , href :: String
-  , title :: String
+  , title :: Nullable String -- in TS wrongly defined as String
   , text :: String
   }
 

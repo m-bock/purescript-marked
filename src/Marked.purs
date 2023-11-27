@@ -1,4 +1,32 @@
-module Marked where
+module Marked
+  ( Blockquote
+  , Br
+  , Code
+  , CodeBlockStyle(..)
+  , Codespan
+  , Def
+  , Del
+  , Em
+  , Escape
+  , Heading
+  , Hr
+  , Html
+  , Image
+  , LexerError
+  , Link
+  , LinkRef
+  , List
+  , ListItem
+  , Paragraph
+  , Strong
+  , Table
+  , TableAlign(..)
+  , TableCell
+  , Tag
+  , Text
+  , Token(..)
+  , lexer
+  ) where
 
 import Prelude
 
@@ -14,10 +42,11 @@ import Data.Show.Generic (genericShow)
 import Data.Tuple (Tuple(..))
 import Data.Variant as V
 import Data.Variant.Encodings.Flat as VF
+import Debug (spy)
 import Foreign.Object as Object
 import LabeledData.VariantLike.Class as LD
 import Literals.Null (Null)
-import Marked.Bindings (StringLit)
+import Marked.Bindings (StringLit, UnionWrap(..))
 import Marked.Bindings as Bin
 import TsBridge (toRecord)
 import TsBridge.Types.Intersection as TsIntersection
@@ -42,6 +71,7 @@ data Token
   | TokParagraph Paragraph
   | TokHtml Html
   | TokText Text
+  | TokTag Tag
   | TokDef Def
   | TokEscape Escape
   | TokLink Link
@@ -98,18 +128,20 @@ type Paragraph =
 type Html =
   { raw :: String
   , pre :: Boolean
-  , block :: Boolean
   , text :: String
-  , inLink :: Boolean
-  , inRawBlock :: Boolean
   }
 
 type Text =
   { raw :: String
   , text :: String
   , tokens :: Maybe (Array Token)
+  }
+
+type Tag =
+  { raw :: String
   , inLink :: Boolean
   , inRawBlock :: Boolean
+  , text :: String
   }
 
 type Def =
@@ -127,7 +159,7 @@ type Escape =
 type Link =
   { raw :: String
   , href :: String
-  , title :: String
+  , title :: Maybe String
   , text :: String
   , tokens :: Array Token
   }
@@ -135,7 +167,7 @@ type Link =
 type Image =
   { raw :: String
   , href :: String
-  , title :: String
+  , title :: Maybe String
   , text :: String
   }
 
@@ -211,10 +243,9 @@ lexer str =
 -------------------------------------------------------------------------------
 
 tokenFromImpl :: Bin.Token -> Token
-tokenFromImpl =
-  un Bin.Token
-    >>> VF.normalizeEncodingFlat
-    >>>
+tokenFromImpl (Bin.Token tok) =
+  VF.normalizeEncodingFlat tok
+    #
       ( V.case_ # V.onMatch
           { space: \_ ->
               TokSpace
@@ -264,52 +295,42 @@ tokenFromImpl =
           , paragraph: toRecord >>> \{ raw, pre, text, tokens } ->
               TokParagraph
                 { raw
-                , pre: case pre of
-                    Just u -> case uorToMaybe u of
-                      Just bool -> bool
-                      Nothing -> false
-                    Nothing -> false
+                , pre: fromMaybe false do
+                    u <- pre
+                    uorToMaybe u
                 , text
                 , tokens: map tokenFromImpl tokens
                 }
-          , html: toRecord >>> \{ raw, pre, block, text, inLink, inRawBlock } ->
-              TokHtml
-                { raw
-                , pre
-                , block
-                , text
-                , inLink: case inLink of
-                    Just bool -> bool
-                    Nothing -> false
-                , inRawBlock: case inRawBlock of
-                    Just bool -> bool
-                    Nothing -> false
-                }
-          , text: toRecord >>> \{ raw, text, tokens, inLink, inRawBlock } ->
-              TokText
-                { raw
-                , text
-                , tokens: case tokens of
-                    Just u -> case uorToMaybe u of
-                      Just arr -> Just $ map tokenFromImpl arr
-                      Nothing -> Nothing
-                    Nothing -> Nothing
-                , inLink: case inLink of
-                    Just bool -> bool
-                    Nothing -> false
-                , inRawBlock: case inRawBlock of
-                    Just bool -> bool
-                    Nothing -> false
-                }
+          , html: \(UnionWrap u) -> case UntaggedUnion.toEither1 u of
+              Left { raw, inLink, inRawBlock, text } ->
+                TokTag { raw, inLink, inRawBlock, text }
+              Right { text, pre, raw } ->
+                TokHtml { text, pre, raw }
+          , text: \(UnionWrap u) -> case UntaggedUnion.toEither1 u of
+              Left { raw, inLink, inRawBlock, text } ->
+                TokTag { raw, inLink, inRawBlock, text }
+              Right r -> toRecord r # \{ raw, text, tokens } ->
+                TokText
+                  { raw
+                  , text
+                  , tokens: do
+                      u' <- tokens
+                      arr <- uorToMaybe u'
+                      Just $ map tokenFromImpl arr
+                  }
           , def: \r ->
               TokDef r
           , escape: \r ->
               TokEscape r
-
           , link: \r ->
               TokLink $ linkFromImpl r
-          , image: \r ->
-              TokImage r
+          , image: \{ raw, href, title, text } ->
+              TokImage
+                { raw
+                , href
+                , title: Nullable.toMaybe title
+                , text
+                }
           , strong: \{ raw, text, tokens } ->
               TokStrong
                 { raw
@@ -355,7 +376,7 @@ linkFromImpl :: Bin.Link -> Link
 linkFromImpl { raw, href, title, text, tokens } =
   { raw
   , href
-  , title
+  , title: Nullable.toMaybe title
   , text
   , tokens: map tokenFromImpl tokens
   }
@@ -370,11 +391,9 @@ listItemFromImpl :: Bin.ListItem -> ListItem
 listItemFromImpl = toRecord >>> \{ raw, task, checked, loose, text, tokens } ->
   { raw
   , task
-  , checked: case checked of
-      Just u -> case uorToMaybe u of
-        Just bool -> bool
-        Nothing -> false
-      Nothing -> false
+  , checked: fromMaybe false do
+      u <- checked
+      uorToMaybe u
   , loose
   , text
   , tokens: map tokenFromImpl tokens
@@ -399,4 +418,4 @@ instance Show TableAlign where
   show = genericShow
 
 instance Show CodeBlockStyle where
-  show x = genericShow x
+  show = genericShow

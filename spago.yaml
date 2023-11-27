@@ -27,7 +27,11 @@ package:
     main: Test.Main
 workspace:
   extra_packages:
-    ts-bridge: 2.3.0
-    dts: 0.3.0
+    # ts-bridge: 2.3.0
+    # dts: 0.3.0  
+    ts-bridge:
+      path: ../purescript-ts-bridge
+    dts:
+      path: ../purescript-dts
   package_set:
     registry: 46.2.0
