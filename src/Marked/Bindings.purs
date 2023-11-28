@@ -1,5 +1,6 @@
 -- | Low level bindings to marked.js
 -- | Describes the JS API as it is in terms of PureScript types.
+-- | There is no performance overhead compared to the JS API.
 -- | Statically checked against TS types by ts-bridge.
 module Marked.Bindings
   ( Align
@@ -110,7 +111,11 @@ type Table =
   , rows :: Array (Array TableCell)
   }
 
-type Align = StringLit "center" |+| StringLit "left" |+| StringLit "right" |+| Null
+type Align =
+  StringLit "center"
+    |+| StringLit "left"
+    |+| StringLit "right"
+    |+| Null
 
 type TableCell =
   { text :: String
