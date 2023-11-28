@@ -1,3 +1,4 @@
+-- | PureScript idiomatic wrapper around bindings to marked.js
 module Marked
   ( Blockquote
   , Br
@@ -36,13 +37,11 @@ import Data.Int as Int
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Newtype (un)
 import Data.Nullable as Nullable
 import Data.Show.Generic (genericShow)
-import Data.Tuple (Tuple(..))
+import Data.Tuple.Nested ((/\))
 import Data.Variant as V
 import Data.Variant.Encodings.Flat as VF
-import Debug (spy)
 import Foreign.Object as Object
 import LabeledData.VariantLike.Class as LD
 import Literals.Null (Null)
@@ -225,136 +224,152 @@ type LinkRef =
 -------------------------------------------------------------------------------
 
 lexer :: String -> Either LexerError { tokens :: Array Token, links :: Map String LinkRef }
-lexer str =
-  let
-    result = LD.fromVariant $ Bin.lexer str
-  in
-    case result of
-      Left err -> Left err
-      Right val | (Tuple tokens { links }) <- TsIntersection.toTuple val -> Right
-        { tokens: map tokenFromImpl tokens
-        , links:
-            links
-              # (Object.toUnfoldable :: _ -> Array _)
-              # map (map linkRefFromImpl)
-              # Map.fromFoldable
-        }
+lexer str = do
+  val <- LD.fromVariant $ Bin.lexer str
+  let (tokens /\ { links }) = TsIntersection.toTuple val
+  pure
+    { tokens: map tokenFromImpl tokens
+    , links:
+        links
+          # (Object.toUnfoldable :: _ -> Array _)
+          # map (map linkRefFromImpl)
+          # Map.fromFoldable
+    }
 
 -------------------------------------------------------------------------------
 
 tokenFromImpl :: Bin.Token -> Token
 tokenFromImpl (Bin.Token tok) =
-  VF.normalizeEncodingFlat tok
-    #
-      ( V.case_ # V.onMatch
-          { space: \_ ->
-              TokSpace
-          , code: toRecord >>> \{ raw, codeBlockStyle, text, lang } ->
-              TokCode
-                { raw
-                , codeBlockStyle: case codeBlockStyle of
-                    Just val | Just _ <- uorToMaybe val -> Indented
-                    _ -> Fenced
-                , text
-                , lang: lang >>= uorToMaybe
-                }
-          , heading: \{ raw, depth, text, tokens } ->
-              TokHeading
-                { raw
-                , depth: fromMaybe 0 $ Int.fromNumber depth
-                , text
-                , tokens: map tokenFromImpl tokens
-                }
-          , table: \{ raw, align, header, rows } ->
-              TokTable
-                { raw
-                , align: map alignFromImpl align
-                , header: map tableCellFromImpl header
-                , rows: map (map tableCellFromImpl) rows
-                }
-          , hr: \r ->
-              TokHr r
-          , blockquote: \{ raw, text, tokens } ->
-              TokBlockquote
-                { raw
-                , text
-                , tokens: map tokenFromImpl tokens
-                }
-          , list: \{ raw, ordered, start, loose, items } ->
-              TokList
-                { raw
-                , ordered
-                , start: case UntaggedUnion.toEither1 start of
-                    Left (n :: Number) -> Just $ fromMaybe 0 $ Int.fromNumber n
-                    Right (_ :: StringLit "") -> Nothing
-                , loose
-                , items: map listItemFromImpl items
-                }
-          , list_item: \r ->
-              TokListItem $ listItemFromImpl r
-          , paragraph: toRecord >>> \{ raw, pre, text, tokens } ->
-              TokParagraph
-                { raw
-                , pre: fromMaybe false do
-                    u <- pre
-                    uorToMaybe u
-                , text
-                , tokens: map tokenFromImpl tokens
-                }
-          , html: \(UnionWrap u) -> case UntaggedUnion.toEither1 u of
-              Left { raw, inLink, inRawBlock, text } ->
-                TokTag { raw, inLink, inRawBlock, text }
-              Right { text, pre, raw } ->
-                TokHtml { text, pre, raw }
-          , text: \(UnionWrap u) -> case UntaggedUnion.toEither1 u of
-              Left { raw, inLink, inRawBlock, text } ->
-                TokTag { raw, inLink, inRawBlock, text }
-              Right r -> toRecord r # \{ raw, text, tokens } ->
-                TokText
-                  { raw
-                  , text
-                  , tokens: do
-                      u' <- tokens
-                      arr <- uorToMaybe u'
-                      Just $ map tokenFromImpl arr
-                  }
-          , def: \r ->
-              TokDef r
-          , escape: \r ->
-              TokEscape r
-          , link: \r ->
-              TokLink $ linkFromImpl r
-          , image: \{ raw, href, title, text } ->
-              TokImage
-                { raw
-                , href
-                , title: Nullable.toMaybe title
-                , text
-                }
-          , strong: \{ raw, text, tokens } ->
-              TokStrong
-                { raw
-                , text
-                , tokens: map tokenFromImpl tokens
-                }
-          , em: \{ raw, text, tokens } ->
-              TokEm
-                { raw
-                , text
-                , tokens: map tokenFromImpl tokens
-                }
-          , codespan: \r ->
-              TokCodespan r
-          , br: \r ->
-              TokBr r
-          , del: \{ raw, text, tokens } ->
-              TokDel
-                { raw
-                , text
-                , tokens: map tokenFromImpl tokens
-                }
-          }
-      )
+  matchVariant $ VF.normalizeEncodingFlat tok
+  where
+  matchVariant =
+    V.case_ # V.onMatch
+      { space: \_ ->
+          TokSpace
+
+      , code: toRecord >>> \{ raw, codeBlockStyle, text, lang } ->
+          TokCode
+            { raw
+            , codeBlockStyle: case codeBlockStyle of
+                Just val | Just _ <- uorToMaybe val -> Indented
+                _ -> Fenced
+            , text
+            , lang: lang >>= uorToMaybe
+            }
+      
+      , heading: \{ raw, depth, text, tokens } ->
+          TokHeading
+            { raw
+            , depth: fromMaybe 0 $ Int.fromNumber depth
+            , text
+            , tokens: map tokenFromImpl tokens
+            }
+      
+      , table: \{ raw, align, header, rows } ->
+          TokTable
+            { raw
+            , align: map alignFromImpl align
+            , header: map tableCellFromImpl header
+            , rows: map (map tableCellFromImpl) rows
+            }
+      
+      , hr: \r ->
+          TokHr r
+      
+      , blockquote: \{ raw, text, tokens } ->
+          TokBlockquote
+            { raw
+            , text
+            , tokens: map tokenFromImpl tokens
+            }
+      
+      , list: \{ raw, ordered, start, loose, items } ->
+          TokList
+            { raw
+            , ordered
+            , start: case UntaggedUnion.toEither1 start of
+                Left (n :: Number) -> Just $ fromMaybe 0 $ Int.fromNumber n
+                Right (_ :: StringLit "") -> Nothing
+            , loose
+            , items: map listItemFromImpl items
+            }
+      
+      , list_item: \r ->
+          TokListItem $ listItemFromImpl r
+      
+      , paragraph: toRecord >>> \{ raw, pre, text, tokens } ->
+          TokParagraph
+            { raw
+            , pre: fromMaybe false do
+                u <- pre
+                uorToMaybe u
+            , text
+            , tokens: map tokenFromImpl tokens
+            }
+      
+      , html: \(UnionWrap u) -> case UntaggedUnion.toEither1 u of
+          Left { raw, inLink, inRawBlock, text } ->
+            TokTag { raw, inLink, inRawBlock, text }
+          Right { text, pre, raw } ->
+            TokHtml { text, pre, raw }
+      
+      , text: \(UnionWrap u) -> case UntaggedUnion.toEither1 u of
+          Left { raw, inLink, inRawBlock, text } ->
+            TokTag { raw, inLink, inRawBlock, text }
+          Right r -> toRecord r # \{ raw, text, tokens } ->
+            TokText
+              { raw
+              , text
+              , tokens: do
+                  u' <- tokens
+                  arr <- uorToMaybe u'
+                  Just $ map tokenFromImpl arr
+              }
+      
+      , def: \r ->
+          TokDef r
+      
+      , escape: \r ->
+          TokEscape r
+      
+      , link: \r ->
+          TokLink $ linkFromImpl r
+      
+      , image: \{ raw, href, title, text } ->
+          TokImage
+            { raw
+            , href
+            , title: Nullable.toMaybe title
+            , text
+            }
+      
+      , strong: \{ raw, text, tokens } ->
+          TokStrong
+            { raw
+            , text
+            , tokens: map tokenFromImpl tokens
+            }
+      
+      , em: \{ raw, text, tokens } ->
+          TokEm
+            { raw
+            , text
+            , tokens: map tokenFromImpl tokens
+            }
+      
+      , codespan: \r ->
+          TokCodespan r
+      
+      , br: \r ->
+          TokBr r
+      
+      , del: \{ raw, text, tokens } ->
+          TokDel
+            { raw
+            , text
+            , tokens: map tokenFromImpl tokens
+            }
+      }
 
 alignFromImpl :: Bin.Align -> TableAlign
 alignFromImpl al1 =

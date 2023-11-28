@@ -1,37 +1,32 @@
 package:
   dependencies:
     [
-      "console",
-      "dts",
-      "effect",
-      "either",
-      "foreign-object",
-      "integers",
-      "labeled-data",
-      "literals",
-      "maybe",
-      "newtype",
-      "nullable",
-      "prelude",
-      "ts-bridge",
-      "unsafe-coerce",
-      "untagged-union",
-      "variant",
-      "variant-encodings",
+      { dts: ">=1.0.0 <2.0.0" },
+      { either: ">=6.1.0 <7.0.0" },
+      { foreign-object: ">=4.1.0 <5.0.0" },
+      { integers: ">=6.0.0 <7.0.0" },
+      { labeled-data: ">=0.2.0 <0.3.0" },
+      { literals: ">=1.0.2 <2.0.0" },
+      { maybe: ">=6.0.0 <7.0.0" },
+      { newtype: ">=5.0.0 <6.0.0" },
+      { nullable: ">=6.0.0 <7.0.0" },
+      { prelude: ">=6.0.1 <7.0.0" },
+      { ts-bridge: ">=3.0.0 <4.0.0" },
+      { unsafe-coerce: ">=6.0.0 <7.0.0" },
+      { untagged-union: ">=1.0.0 <2.0.0" },
+      { variant: ">=8.0.0 <9.0.0" },
+      { variant-encodings: ">=2.0.0 <3.0.0" },
     ]
   name: marked
   test:
-    dependencies:
-      [ "spec"
-      ]
+    dependencies: 
+      - spec
+      - effect
+      - console
     main: Test.Main
 workspace:
   extra_packages:
-    # ts-bridge: 2.3.0
-    # dts: 0.3.0  
-    ts-bridge:
-      path: ../purescript-ts-bridge
-    dts:
-      path: ../purescript-dts
+    ts-bridge: 3.0.0
+    dts: 1.0.0
   package_set:
     registry: 46.2.0

@@ -4,9 +4,7 @@ import Prelude
 
 import Data.Either (Either(..))
 import Data.Map (fromFoldable)
-import Data.Map as Map
 import Data.Maybe (Maybe(..))
-import Data.Tuple (Tuple(..))
 import Marked (CodeBlockStyle(..), TableAlign(..), Token(..))
 import Marked as ME
 import Test.Spec (Spec, describe, it)

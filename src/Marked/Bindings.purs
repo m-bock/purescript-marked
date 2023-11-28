@@ -1,3 +1,6 @@
+-- | Low level bindings to marked.js
+-- | Describes the JS API as it is in terms of PureScript types.
+-- | Statically checked against TS types by ts-bridge.
 module Marked.Bindings
   ( Align
   , Blockquote
@@ -31,8 +34,7 @@ module Marked.Bindings
   , UnionWrap(..)
   , lexer
   , tsModules
-  )
-  where
+  ) where
 
 import Prelude
 
@@ -55,38 +57,6 @@ import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 import Untagged.TypeCheck (class HasRuntimeType)
 import Untagged.Union (type (|+|), UndefinedOr)
-
-newtype LitWrap a = LitWrap a
-
-derive newtype instance TsBridge a => TsBridge (LitWrap a)
-
-instance IsSymbol sym => HasRuntimeType (LitWrap (Literal String sym)) where
-  hasRuntimeType _ val =
-    unsafeCoerce val == reflectSymbol (Proxy :: _ sym)
-
-instance HasRuntimeType (LitWrap (Literal Boolean "true")) where
-  hasRuntimeType _ val =
-    unsafeCoerce val == true
-
-instance HasRuntimeType (LitWrap (Literal Boolean "false")) where
-  hasRuntimeType _ val =
-    unsafeCoerce val == false
-
-type StringLit sym = LitWrap (Literals.StringLit sym)
-
-type BooleanLit b = LitWrap (Literals.BooleanLit b)
-
-newtype UnionWrap a = UnionWrap a
-
-derive newtype instance TsBridge a => TsBridge (UnionWrap a)
-
-instance
-  ( IsRecordWithoutKey sym a
-  , IsRecordWithoutKey sym b
-  ) =>
-  IsRecordWithoutKey sym (UnionWrap (a |+| b))
-  where
-  isRecordWithoutKey _ = Proxy
 
 -------------------------------------------------------------------------------
 --- FFI
@@ -265,6 +235,42 @@ type LinkRef =
   }
 
 foreign import lexer :: String -> EitherV String (Array Token |&| Links)
+
+-------------------------------------------------------------------------------
+--- Instances
+-------------------------------------------------------------------------------
+
+type StringLit sym = LitWrap (Literals.StringLit sym)
+
+type BooleanLit b = LitWrap (Literals.BooleanLit b)
+
+newtype LitWrap a = LitWrap a
+
+derive newtype instance TsBridge a => TsBridge (LitWrap a)
+
+instance IsSymbol sym => HasRuntimeType (LitWrap (Literal String sym)) where
+  hasRuntimeType _ val =
+    unsafeCoerce val == reflectSymbol (Proxy :: _ sym)
+
+instance HasRuntimeType (LitWrap (Literal Boolean "true")) where
+  hasRuntimeType _ val =
+    unsafeCoerce val == true
+
+instance HasRuntimeType (LitWrap (Literal Boolean "false")) where
+  hasRuntimeType _ val =
+    unsafeCoerce val == false
+
+newtype UnionWrap a = UnionWrap a
+
+derive newtype instance TsBridge a => TsBridge (UnionWrap a)
+
+instance
+  ( IsRecordWithoutKey sym a
+  , IsRecordWithoutKey sym b
+  ) =>
+  IsRecordWithoutKey sym (UnionWrap (a |+| b))
+  where
+  isRecordWithoutKey _ = Proxy
 
 -------------------------------------------------------------------------------
 --- TsBridge
