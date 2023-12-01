@@ -25,7 +25,7 @@ package:
       - console
     main: Test.Main
   publish:
-    version: 4.0.0
+    version: 0.1.0
     license: BSD-3-Clause
     location:
       githubOwner: thought2
