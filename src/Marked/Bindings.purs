@@ -5,7 +5,6 @@
 module Marked.Bindings
   ( Align
   , Blockquote
-  , BooleanLit
   , Br
   , Code
   , Codespan
@@ -22,41 +21,32 @@ module Marked.Bindings
   , Links
   , List
   , ListItem
-  , LitWrap(..)
   , Paragraph
   , Space
-  , StringLit
   , Strong
   , Table
   , TableCell
   , Tag
   , Text
   , Token(..)
-  , UnionWrap(..)
   , lexer
   , tsModules
   ) where
-
-import Prelude
 
 import DTS as DTS
 import Data.Either (Either)
 import Data.Newtype (class Newtype)
 import Data.Nullable (Nullable)
-import Data.Symbol (class IsSymbol, reflectSymbol)
-import Data.Variant.Encodings.Flat (class IsRecordWithoutKey, VariantEncodedFlat)
+import Data.Variant.Encodings.Flat (VariantEncodedFlat)
 import Foreign.Object (Object)
 import LabeledData.VariantLike.Class (EitherV)
-import Literals (Literal)
-import Literals as Literals
 import Literals.Null (Null)
-import Prim.Boolean (True)
-import TsBridge (type (|&|), Mod, TsRecord)
+import Prim.Boolean (False, True)
+import TsBridge (type (|&|), type (~), TsRecord, Opt)
 import TsBridge as TSB
 import TsBridge.Class (class TsBridge, Tok(..))
-import Type.Proxy (Proxy(..))
-import Unsafe.Coerce (unsafeCoerce)
-import Untagged.TypeCheck (class HasRuntimeType)
+import TsBridge.Types.Lit (Lit)
+import TsBridge.Types.RecordUnion (RecordUnion)
 import Untagged.Union (type (|+|), UndefinedOr)
 
 -------------------------------------------------------------------------------
@@ -74,8 +64,8 @@ newtype Token = Token
       , list :: List
       , list_item :: ListItem
       , paragraph :: Paragraph
-      , html :: UnionWrap (Tag |+| Html)
-      , text :: UnionWrap (Tag |+| Text)
+      , html :: RecordUnion (Tag |+| Html)
+      , text :: RecordUnion (Tag |+| Text)
       , def :: Def
       , escape :: Escape
       , link :: Link
@@ -91,10 +81,10 @@ newtype Token = Token
 type Space = { raw :: String }
 
 type Code = TsRecord
-  ( raw :: Mod () String
-  , codeBlockStyle :: Mod (optional :: True) (UndefinedOr (StringLit "indented"))
-  , lang :: Mod (optional :: True) (UndefinedOr String)
-  , text :: Mod () String
+  ( raw :: () ~ String
+  , codeBlockStyle :: Opt ~ UndefinedOr (Lit "indented" String)
+  , lang :: Opt ~ UndefinedOr String
+  , text :: () ~ String
   )
 
 type Heading =
@@ -112,9 +102,9 @@ type Table =
   }
 
 type Align =
-  StringLit "center"
-    |+| StringLit "left"
-    |+| StringLit "right"
+  Lit "center" String
+    |+| Lit "left" String
+    |+| Lit "right" String
     |+| Null
 
 type TableCell =
@@ -135,45 +125,45 @@ type Blockquote =
 type List =
   { raw :: String
   , ordered :: Boolean
-  , start :: Number |+| (StringLit "")
+  , start :: Number |+| (Lit "" String)
   , loose :: Boolean
   , items :: Array ListItem
   }
 
 type ListItem = TsRecord
-  ( raw :: Mod () String
-  , task :: Mod () Boolean
-  , checked :: Mod (optional :: True) (UndefinedOr Boolean)
-  , loose :: Mod () Boolean
-  , text :: Mod () String
-  , tokens :: Mod () (Array Token)
+  ( raw :: () ~ String
+  , task :: () ~ Boolean
+  , checked :: (Opt) ~ UndefinedOr Boolean
+  , loose :: () ~ Boolean
+  , text :: () ~ String
+  , tokens :: () ~ (Array Token)
   )
 
 type Paragraph = TsRecord
-  ( raw :: Mod () String
-  , pre :: Mod (optional :: True) (UndefinedOr Boolean)
-  , text :: Mod () String
-  , tokens :: Mod () (Array Token)
+  ( raw :: () ~ String
+  , pre :: (Opt) ~ UndefinedOr Boolean
+  , text :: () ~ String
+  , tokens :: () ~ Array Token
   )
 
 type Html =
   { raw :: String
   , pre :: Boolean
-  , block :: BooleanLit "true"
+  , block :: Lit True Boolean
   , text :: String
   }
 
 type Text = TsRecord
-  ( raw :: Mod () String
-  , text :: Mod () String
-  , tokens :: Mod (optional :: True) (UndefinedOr (Array Token))
+  ( raw :: () ~ String
+  , text :: () ~ String
+  , tokens :: (Opt) ~ UndefinedOr (Array Token)
   )
 
 type Tag =
   { raw :: String
   , inLink :: Boolean
   , inRawBlock :: Boolean
-  , block :: BooleanLit "false"
+  , block :: Lit False Boolean
   , text :: String
   }
 
@@ -240,42 +230,6 @@ type LinkRef =
   }
 
 foreign import lexer :: String -> EitherV String (Array Token |&| Links)
-
--------------------------------------------------------------------------------
---- Instances
--------------------------------------------------------------------------------
-
-type StringLit sym = LitWrap (Literals.StringLit sym)
-
-type BooleanLit b = LitWrap (Literals.BooleanLit b)
-
-newtype LitWrap a = LitWrap a
-
-derive newtype instance TsBridge a => TsBridge (LitWrap a)
-
-instance IsSymbol sym => HasRuntimeType (LitWrap (Literal String sym)) where
-  hasRuntimeType _ val =
-    unsafeCoerce val == reflectSymbol (Proxy :: _ sym)
-
-instance HasRuntimeType (LitWrap (Literal Boolean "true")) where
-  hasRuntimeType _ val =
-    unsafeCoerce val == true
-
-instance HasRuntimeType (LitWrap (Literal Boolean "false")) where
-  hasRuntimeType _ val =
-    unsafeCoerce val == false
-
-newtype UnionWrap a = UnionWrap a
-
-derive newtype instance TsBridge a => TsBridge (UnionWrap a)
-
-instance
-  ( IsRecordWithoutKey sym a
-  , IsRecordWithoutKey sym b
-  ) =>
-  IsRecordWithoutKey sym (UnionWrap (a |+| b))
-  where
-  isRecordWithoutKey _ = Proxy
 
 -------------------------------------------------------------------------------
 --- TsBridge

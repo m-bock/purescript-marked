@@ -45,10 +45,11 @@ import Data.Variant.Encodings.Flat as VF
 import Foreign.Object as Object
 import LabeledData.VariantLike.Class as LD
 import Literals.Null (Null)
-import Marked.Bindings (StringLit, UnionWrap(..))
 import Marked.Bindings as Bin
 import TsBridge (toRecord)
 import TsBridge.Types.Intersection as TsIntersection
+import TsBridge.Types.Lit (Lit)
+import TsBridge.Types.RecordUnion (RecordUnion(..))
 import Untagged.Union (uorToMaybe)
 import Untagged.Union as UntaggedUnion
 
@@ -256,7 +257,7 @@ tokenFromImpl (Bin.Token tok) =
             , text
             , lang: lang >>= uorToMaybe
             }
-      
+
       , heading: \{ raw, depth, text, tokens } ->
           TokHeading
             { raw
@@ -264,7 +265,7 @@ tokenFromImpl (Bin.Token tok) =
             , text
             , tokens: map tokenFromImpl tokens
             }
-      
+
       , table: \{ raw, align, header, rows } ->
           TokTable
             { raw
@@ -272,31 +273,31 @@ tokenFromImpl (Bin.Token tok) =
             , header: map tableCellFromImpl header
             , rows: map (map tableCellFromImpl) rows
             }
-      
+
       , hr: \r ->
           TokHr r
-      
+
       , blockquote: \{ raw, text, tokens } ->
           TokBlockquote
             { raw
             , text
             , tokens: map tokenFromImpl tokens
             }
-      
+
       , list: \{ raw, ordered, start, loose, items } ->
           TokList
             { raw
             , ordered
             , start: case UntaggedUnion.toEither1 start of
                 Left (n :: Number) -> Just $ fromMaybe 0 $ Int.fromNumber n
-                Right (_ :: StringLit "") -> Nothing
+                Right (_ :: Lit "" String) -> Nothing
             , loose
             , items: map listItemFromImpl items
             }
-      
+
       , list_item: \r ->
           TokListItem $ listItemFromImpl r
-      
+
       , paragraph: toRecord >>> \{ raw, pre, text, tokens } ->
           TokParagraph
             { raw
@@ -306,14 +307,14 @@ tokenFromImpl (Bin.Token tok) =
             , text
             , tokens: map tokenFromImpl tokens
             }
-      
-      , html: \(UnionWrap u) -> case UntaggedUnion.toEither1 u of
+
+      , html: \(RecordUnion u) -> case UntaggedUnion.toEither1 u of
           Left { raw, inLink, inRawBlock, text } ->
             TokTag { raw, inLink, inRawBlock, text }
           Right { text, pre, raw } ->
             TokHtml { text, pre, raw }
-      
-      , text: \(UnionWrap u) -> case UntaggedUnion.toEither1 u of
+
+      , text: \(RecordUnion u) -> case UntaggedUnion.toEither1 u of
           Left { raw, inLink, inRawBlock, text } ->
             TokTag { raw, inLink, inRawBlock, text }
           Right r -> toRecord r # \{ raw, text, tokens } ->
@@ -325,16 +326,16 @@ tokenFromImpl (Bin.Token tok) =
                   arr <- uorToMaybe u'
                   Just $ map tokenFromImpl arr
               }
-      
+
       , def: \r ->
           TokDef r
-      
+
       , escape: \r ->
           TokEscape r
-      
+
       , link: \r ->
           TokLink $ linkFromImpl r
-      
+
       , image: \{ raw, href, title, text } ->
           TokImage
             { raw
@@ -342,27 +343,27 @@ tokenFromImpl (Bin.Token tok) =
             , title: Nullable.toMaybe title
             , text
             }
-      
+
       , strong: \{ raw, text, tokens } ->
           TokStrong
             { raw
             , text
             , tokens: map tokenFromImpl tokens
             }
-      
+
       , em: \{ raw, text, tokens } ->
           TokEm
             { raw
             , text
             , tokens: map tokenFromImpl tokens
             }
-      
+
       , codespan: \r ->
           TokCodespan r
-      
+
       , br: \r ->
           TokBr r
-      
+
       , del: \{ raw, text, tokens } ->
           TokDel
             { raw
@@ -374,11 +375,11 @@ tokenFromImpl (Bin.Token tok) =
 alignFromImpl :: Bin.Align -> TableAlign
 alignFromImpl al1 =
   case UntaggedUnion.toEither1 al1 of
-    Left (_ :: StringLit "center") -> AlignCenter
+    Left (_ :: Lit "center" String) -> AlignCenter
     Right al2 -> case UntaggedUnion.toEither1 al2 of
-      Left (_ :: StringLit "left") -> AlignLeft
+      Left (_ :: Lit "left" String) -> AlignLeft
       Right al3 -> case UntaggedUnion.toEither1 al3 of
-        Left (_ :: StringLit "right") -> AlignRight
+        Left (_ :: Lit "right" String) -> AlignRight
         Right (_ :: Null) -> AlignLeft
 
 tableCellFromImpl :: Bin.TableCell -> TableCell
