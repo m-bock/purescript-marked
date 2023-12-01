@@ -2,7 +2,7 @@
 clean:
     rm -rf .spago output .psa-stash
 
-ci: check-format gen-ts test check-ts
+ci: install check-format gen-ts test check-ts
 
 test:
     spago test
@@ -21,3 +21,6 @@ gen-ts:
 
 check-ts:
     tsc
+
+install:
+    yarn install
